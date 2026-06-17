@@ -22,7 +22,9 @@ const chartOption = computed<EChartsOption | null>(() => {
   if (!dev) return null
   const colors = ['#f97316', '#22d3ee', '#a78bfa', '#34d399']
   const series: any[] = []
-  dev.registers.forEach((reg, i) => {
+  let colorIdx = 0
+  dev.registers.forEach((reg) => {
+    if (!store.isRegisterSelected(dev.id, reg.address)) return
     const key = `${dev.id}_${reg.address}`
     const hd = store.historyData[key]
     if (!hd || !hd.values.length) return
@@ -31,9 +33,10 @@ const chartOption = computed<EChartsOption | null>(() => {
       type: 'line',
       showSymbol: false,
       smooth: true,
-      lineStyle: { color: colors[i % colors.length], width: 2 },
+      lineStyle: { color: colors[colorIdx % colors.length], width: 2 },
       data: hd.time.map((t, j) => [t, hd.values[j]])
     })
+    colorIdx++
   })
   if (!series.length) return null
   return {

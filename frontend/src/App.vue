@@ -43,21 +43,35 @@
     <div class="flex-1 flex flex-col gap-3 p-4 overflow-y-auto">
       <!-- Register Gauges -->
       <div class="grid grid-cols-4 gap-3">
-        <div v-for="d in store.devices" :key="d.id" v-for="r in d.registers" :k="r.address"
-          class="bg-gray-900 rounded-xl p-3">
-          <div class="text-xs text-gray-400">{{ d.name }}</div>
-          <div class="text-2xl font-bold" :class="d.online ? 'text-orange-400' : 'text-gray-600'">
-            {{ typeof r.value === 'number' ? r.value.toFixed(r.value > 100 ? 0 : 1) : r.value ? 'ON' : 'OFF' }}
+        <template v-for="d in store.devices" :key="d.id">
+          <div v-for="r in d.registers" :key="`${d.id}_${r.address}`"
+            class="bg-gray-900 rounded-xl p-3">
+            <div class="text-xs text-gray-400">{{ d.name }}</div>
+            <div class="text-2xl font-bold" :class="d.online ? 'text-orange-400' : 'text-gray-600'">
+              {{ typeof r.value === 'number' ? r.value.toFixed(r.value > 100 ? 0 : 1) : r.value ? 'ON' : 'OFF' }}
+            </div>
+            <div class="text-xs text-gray-500">{{ r.name }} {{ r.unit }}</div>
           </div>
-          <div class="text-xs text-gray-500">{{ r.name }} {{ r.unit }}</div>
-        </div>
+        </template>
       </div>
 
       <!-- Chart -->
       <div class="bg-gray-900 rounded-xl p-3 flex-1">
-        <h3 class="text-sm text-gray-400 mb-2">
-          实时趋势 — {{ store.selectedDevice?.name || '选择设备' }}
-        </h3>
+        <div class="flex justify-between items-start mb-2">
+          <h3 class="text-sm text-gray-400">
+            实时趋势 — {{ store.selectedDevice?.name || '选择设备' }}
+          </h3>
+          <div v-if="store.selectedDevice" class="flex flex-wrap gap-2">
+            <label v-for="reg in store.selectedDevice.registers" :key="reg.address"
+              class="flex items-center gap-1 text-xs text-gray-300 cursor-pointer select-none">
+              <input type="checkbox"
+                :checked="store.isRegisterSelected(store.selectedDevice!.id, reg.address)"
+                @change="store.toggleRegister(store.selectedDevice!.id, reg.address)"
+                class="accent-orange-500" />
+              {{ reg.name }}
+            </label>
+          </div>
+        </div>
         <TrendChart />
       </div>
 

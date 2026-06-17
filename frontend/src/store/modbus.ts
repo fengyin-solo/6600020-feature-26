@@ -1,6 +1,27 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 import type { Device, Alarm, ModbusRegister } from '../types'
+
+const STORAGE_KEY = 'modbus_trend_config'
+
+interface TrendConfig {
+  selectedDeviceId: string | null
+  selectedRegisters: Record<string, number[]>
+}
+
+function loadConfig(): TrendConfig {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch (e) {}
+  return { selectedDeviceId: null, selectedRegisters: {} }
+}
+
+function saveConfig(config: TrendConfig) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+  } catch (e) {}
+}
 
 export const useModbusStore = defineStore('modbus', () => {
   const devices = ref<Device[]>([])
@@ -9,9 +30,27 @@ export const useModbusStore = defineStore('modbus', () => {
   const isPolling = ref(false)
   const pollInterval = ref(1000)
   const selectedDevice = ref<Device | null>(null)
+  const selectedRegisters = ref<Record<string, number[]>>({})
 
   const criticalAlarms = computed(() => alarms.value.filter(a => a.level === 'critical' && !a.acknowledged))
   const onlineDevices = computed(() => devices.value.filter(d => d.online))
+
+  function isRegisterSelected(deviceId: string, address: number): boolean {
+    const list = selectedRegisters.value[deviceId]
+    if (!list || !list.length) return true
+    return list.includes(address)
+  }
+
+  function toggleRegister(deviceId: string, address: number) {
+    if (!selectedRegisters.value[deviceId]) {
+      const dev = devices.value.find(d => d.id === deviceId)
+      selectedRegisters.value[deviceId] = dev ? dev.registers.map(r => r.address) : []
+    }
+    const list = selectedRegisters.value[deviceId]
+    const idx = list.indexOf(address)
+    if (idx >= 0) list.splice(idx, 1)
+    else list.push(address)
+  }
 
   function initMockDevices() {
     devices.value = [
@@ -46,7 +85,23 @@ export const useModbusStore = defineStore('modbus', () => {
         ]
       },
     ]
-    selectedDevice.value = devices.value[0]
+
+    const saved = loadConfig()
+    selectedRegisters.value = saved.selectedRegisters || {}
+
+    const savedDev = saved.selectedDeviceId
+      ? devices.value.find(d => d.id === saved.selectedDeviceId)
+      : null
+    selectedDevice.value = savedDev || devices.value[0]
+
+    watch(
+      () => ({
+        selectedDeviceId: selectedDevice.value?.id || null,
+        selectedRegisters: selectedRegisters.value
+      }),
+      (val) => saveConfig(val as TrendConfig),
+      { deep: true }
+    )
   }
 
   function simulatePoll() {
@@ -91,8 +146,9 @@ export const useModbusStore = defineStore('modbus', () => {
   }
 
   return {
-    devices, alarms, historyData, isPolling, pollInterval, selectedDevice,
+    devices, alarms, historyData, isPolling, pollInterval, selectedDevice, selectedRegisters,
     criticalAlarms, onlineDevices,
-    initMockDevices, simulatePoll, acknowledgeAlarm, toggleDevice
+    initMockDevices, simulatePoll, acknowledgeAlarm, toggleDevice,
+    isRegisterSelected, toggleRegister
   }
 })
